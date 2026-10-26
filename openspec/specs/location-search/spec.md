@@ -164,12 +164,12 @@ Selecting a suggestion (by click, tap, or Enter) SHALL navigate to the current p
 - **WHEN** the current URL has no `units` parameter and the user selects a location
 - **THEN** the resulting URL has `lat`, `lon`, and `name` and no `units` parameter
 
-### Requirement: Active location defaults to St. Louis
-The system SHALL resolve the active location from the `lat`, `lon`, and `name` URL parameters. When `lat` or `lon` is missing or is not a valid coordinate (latitude in [-90, 90], longitude in [-180, 180]), the active location SHALL be St. Louis, MO (lat 38.627, lon -90.199). When coordinates are valid but `name` is missing, a coordinate-based label SHALL be used.
+### Requirement: Active location defaults to Northbrook
+The system SHALL resolve the active location from the `lat`, `lon`, and `name` URL parameters. When `lat` or `lon` is missing or is not a valid coordinate (latitude in [-90, 90], longitude in [-180, 180]), the active location SHALL be Northbrook, IL (lat 42.128, lon -87.829). When coordinates are valid but `name` is missing, a coordinate-based label SHALL be used.
 
 #### Scenario: No location in URL
 - **WHEN** the user opens `/` with no query parameters
-- **THEN** the active location is St. Louis, MO at 38.627, -90.199
+- **THEN** the active location is Northbrook, IL at 42.128, -87.829
 
 #### Scenario: Location in URL
 - **WHEN** the user opens `/?lat=51.50853&lon=-0.12574&name=London`
@@ -177,11 +177,11 @@ The system SHALL resolve the active location from the `lat`, `lon`, and `name` U
 
 #### Scenario: Invalid coordinates
 - **WHEN** the user opens `/?lat=abc&lon=-0.12574`
-- **THEN** the active location is St. Louis, MO
+- **THEN** the active location is Northbrook, IL
 
 #### Scenario: Out-of-range coordinates
 - **WHEN** the user opens `/?lat=95&lon=10`
-- **THEN** the active location is St. Louis, MO
+- **THEN** the active location is Northbrook, IL
 
 #### Scenario: Coordinates without a name
 - **WHEN** the user opens `/?lat=40&lon=-75`
