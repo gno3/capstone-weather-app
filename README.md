@@ -1,24 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Capstone Weather App
 
-## Getting Started
+A mobile-first weather dashboard built with Next.js (App Router), TypeScript, Tailwind CSS,
+and Recharts, using forecast and geocoding data from [Open-Meteo](https://open-meteo.com/).
+It is hosted on Azure App Service (Linux, Node 22 LTS) as a Next.js standalone build.
 
-First, run the development server:
+## Prerequisites
+
+- Node.js 22 LTS and npm
+- For deploying: an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli),
+  `zip`, and `curl` (bash on Linux, macOS, or WSL)
+
+No API keys are needed.
+
+## Local development
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). To run the production build locally:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+npm start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tests
+
+```bash
+npm test        # Vitest unit and route tests (offline)
+npm run lint    # ESLint
+```
 
 ## Dashboard
 
@@ -165,17 +178,64 @@ Invalid requests never contact the provider, and 502 bodies never include provid
 Returns `{ "results": Location[] }` for 2–100 character queries; 400 otherwise, 502 on
 upstream failure.
 
-## Learn More
+### `GET /api/health`
 
-To learn more about Next.js, take a look at the following resources:
+Liveness check used by the deploy script. Always `200 { "status": "ok" }` with
+`Cache-Control: no-store`; it does not call Open-Meteo.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+curl -i http://localhost:3000/api/health
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy to Azure
 
-## Deploy on Vercel
+```bash
+az login
+./scripts/deploy.sh
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The script checks that the Azure CLI is installed and logged in, builds the standalone
+output, zips it to `app.zip`, creates the resource group, App Service plan, and web app if
+they don't exist, configures the app (no build on Azure, startup command `node server.js`,
+HTTPS only), zip-deploys, and waits up to 3 minutes for `/api/health` to return 200. It
+prints the app URL on success and exits non-zero on any failure.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `APP` | `capstone-weather-app` | Web app name; becomes `https://<APP>.azurewebsites.net` |
+| `RG` | `rg-capstone-weather-app` | Resource group |
+| `LOC` | `centralus` | Azure region |
+| `PLAN` | `plan-capstone-weather-app` | App Service plan (always Linux, `B1`) |
+
+Web app names are global across Azure. If the default is taken, the script stops before
+building or creating anything and asks for another name:
+
+```bash
+APP=my-weather-1234 ./scripts/deploy.sh
+```
+
+Re-running the script is safe: existing resources are reused, the settings are re-applied,
+and the new build replaces the old one. Use the same variables each time.
+
+## Teardown
+
+```bash
+./scripts/teardown.sh                 # or RG=<your-group> ./scripts/teardown.sh
+az group exists -n rg-capstone-weather-app   # prints false once deletion finishes
+```
+
+The script asks for confirmation (`y`/`yes`), then deletes the whole resource group in
+the background. Answering anything else deletes nothing.
+
+## Cost
+
+The B1 Linux App Service plan is billed hourly for as long as it exists, whether or not the
+app gets traffic (roughly US$13/month at list price; see
+[App Service pricing](https://azure.microsoft.com/pricing/details/app-service/linux/)). Run
+the teardown script when you are done to stop charges.
+
+## Data attribution
+
+Weather data by [Open-Meteo.com](https://open-meteo.com/), licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The attribution is shown on
+every page of the app.
