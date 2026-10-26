@@ -278,7 +278,8 @@ every push to `main` and on manual runs. It:
 2. Runs `npm ci`, `npm run lint`, and `npm test`, then `./scripts/package.sh` (which builds).
    If any of these fail, nothing is uploaded.
 3. Signs in to Azure with OpenID Connect (no client secret or publish profile), reads the
-   web app's host name, and zip-deploys `app.zip` with `az webapp deploy`.
+   web app's host name, and zip-deploys `app.zip` with `az webapp deploy` (without
+   waiting for start-up; the health check in the next step covers that).
 4. Polls `https://<host>/api/health` for up to 3 minutes. The run passes only if it gets
    HTTP 200, and the app URL is written to the run summary.
 

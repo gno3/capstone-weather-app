@@ -71,7 +71,7 @@ jobs:
           echo "host=$host" >> "$GITHUB_OUTPUT"
 
       - name: Upload package
-        run: az webapp deploy -g "$RG" -n "$APP" --src-path app.zip --type zip
+        run: az webapp deploy -g "$RG" -n "$APP" --src-path app.zip --type zip --track-status false
 
       - name: Wait for /api/health
         env:
