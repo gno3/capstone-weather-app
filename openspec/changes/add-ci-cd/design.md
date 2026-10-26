@@ -50,7 +50,8 @@ See proposal.md for motivation, and `specs/ci-cd` and `specs/azure-deployment` f
 
 ### 4. Upload and health check
 - `az webapp show -g "$RG" -n "$APP" --query defaultHostName -o tsv` gets the host. It is read-only and fails if the app doesn't exist, which meets the "never provision" requirement before anything is uploaded.
-- `az webapp deploy -g "$RG" -n "$APP" --src-path app.zip --type zip`. No `appsettings set`, `config set`, `update`, or `create` calls appear anywhere in the workflows.
+- `az webapp deploy -g "$RG" -n "$APP" --src-path app.zip --type zip --track-status false`. No `appsettings set`, `config set`, `update`, or `create` calls appear anywhere in the workflows.
+  - `--track-status false`: by default the CLI waits for the site to start after the upload, and it keeps waiting well past 3 minutes when the site cannot start (found while verifying with a stopped app). Without tracking, the step ends once Kudu accepts the package, and the 3-minute `wait_healthy` check is the only gate on start-up, so a site that never comes up fails the run within the spec's limit and names the URL. A failed upload still fails the step.
 - Health: `source scripts/deploy.sh` (main is guarded, so nothing runs) and call `wait_healthy "https://$host"`. This reuses the same 180 s / 5 s polling loop and error message as local deploy, so there is one health-check implementation. A non-zero return fails the step and the run. The app URL is echoed and written to `$GITHUB_STEP_SUMMARY` on success.
   - *Alternative*: inline `curl --retry` in YAML. Rejected because it would duplicate logic that already exists, and `--retry` doesn't cleanly bound the total time to exactly 3 minutes across non-200 responses.
   - `wait_healthy`'s failure hint references `$RG`/`$APP`; the step exports both from `vars`, so the message stays accurate.
