@@ -51,6 +51,12 @@ Invalid or missing coordinates fall back to Northbrook, IL. The °F/°C control 
 from search keeps the current `units`. Hourly labels and sun times use the forecast
 location's local clock, not the browser's timezone.
 
+### Screenshots
+![Dashboard](image.png)
+
+![Phone View](image-1.png)
+
+
 ### Checking the dashboard locally
 
 Server components fetch forecasts on the server, so browser request mocking cannot control
