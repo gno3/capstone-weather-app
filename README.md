@@ -200,11 +200,13 @@ az login
 ./scripts/deploy.sh
 ```
 
-The script checks that the Azure CLI is installed and logged in, builds the standalone
-output, zips it to `app.zip`, creates the resource group, App Service plan, and web app if
+The script checks that the Azure CLI is installed and logged in, then runs
+`scripts/package.sh` to build the standalone output and zip it to `app.zip`. It then
+creates the resource group, App Service plan, and web app if
 they don't exist, configures the app (no build on Azure, startup command `node server.js`,
 HTTPS only), zip-deploys, and waits up to 3 minutes for `/api/health` to return 200. It
 prints the app URL on success and exits non-zero on any failure.
+
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -222,6 +224,126 @@ APP=my-weather-1234 ./scripts/deploy.sh
 
 Re-running the script is safe: existing resources are reused, the settings are re-applied,
 and the new build replaces the old one. Use the same variables each time.
+
+### Package only
+
+To build the deploy package without Azure (needs Node 22, npm, and `zip`):
+
+```bash
+./scripts/package.sh
+unzip -l app.zip | grep -E ' (server\.js|public/|\.next/static/)$'
+```
+
+It runs `npm ci` and `npm run build`, then writes `app.zip` at the repository root. If the
+build fails, it exits non-zero and leaves no `app.zip` behind.
+
+## CI/CD
+
+GitHub Actions checks every pull request and deploys `main` to the existing Azure web app.
+
+### Pull request checks
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) (workflow `CI`, job `ci`) runs on
+every pull request with Node 22: `npm ci`, `npm run lint`, `npm test`, and `npm run build`.
+If any step fails, the check fails. A newer push to the same pull request cancels the
+older run.
+
+To stop pull requests with failing checks from merging, require the `ci` check on `main`.
+In **Settings → Branches** (or **Settings → Rules → Rulesets**), add a rule for `main`,
+enable **Require status checks to pass**, and select `ci`. The check only appears in the
+list after it has run once, so open a pull request first. Or use the GitHub CLI (this
+replaces any existing protection on `main`):
+
+```bash
+gh api -X PUT repos/gno3/capstone-weather-app/branches/main/protection --input - <<'EOF'
+{
+  "required_status_checks": { "strict": true, "contexts": ["ci"] },
+  "enforce_admins": false,
+  "required_pull_request_reviews": null,
+  "restrictions": null
+}
+EOF
+```
+
+### Deploying `main`
+
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) (workflow `Deploy`) runs on
+every push to `main` and on manual runs. It:
+
+1. Fails right away if the run is not on `main`, or if any secret or variable below is
+   missing (naming each missing one).
+2. Runs `npm ci`, `npm run lint`, and `npm test`, then `./scripts/package.sh` (which builds).
+   If any of these fail, nothing is uploaded.
+3. Signs in to Azure with OpenID Connect (no client secret or publish profile), reads the
+   web app's host name, and zip-deploys `app.zip` with `az webapp deploy`.
+4. Polls `https://<host>/api/health` for up to 3 minutes. The run passes only if it gets
+   HTTP 200, and the app URL is written to the run summary.
+
+The pipeline never creates Azure resources and never changes app settings or site
+configuration. **Run `./scripts/deploy.sh` once first** to provision and configure the
+web app; if the app does not exist, the `Deploy` run fails without creating anything.
+
+| Name | Kind | Holds |
+| --- | --- | --- |
+| `AZURE_CLIENT_ID` | Secret | Application (client) ID of the app registration used to sign in |
+| `AZURE_TENANT_ID` | Secret | Microsoft Entra tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | Secret | Subscription that contains the web app |
+| `APP` | Variable | Web app name, the same `APP` used with `deploy.sh` |
+| `RG` | Variable | Resource group of the web app, the same `RG` used with `deploy.sh` |
+
+Add them under **Settings → Secrets and variables → Actions** (secrets on the **Secrets**
+tab, `APP` and `RG` on the **Variables** tab).
+
+#### One-time Azure setup
+
+Run these once, logged in with `az login` as someone who can create app registrations and
+assign roles on the web app. Use the same `APP` and `RG` as `deploy.sh`:
+
+```bash
+APP=capstone-weather-app RG=rg-capstone-weather-app
+
+# App registration and service principal for GitHub Actions
+appId=$(az ad app create --display-name "gh-capstone-weather-app-deploy" --query appId -o tsv)
+az ad sp create --id "$appId" -o none
+
+# Trust GitHub's OIDC tokens for this repository's main branch only
+az ad app federated-credential create --id "$appId" --parameters '{
+  "name": "github-main",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:gno3/capstone-weather-app:ref:refs/heads/main",
+  "audiences": ["api://AzureADTokenExchange"]
+}'
+
+# Website Contributor on this one web app (can deploy; cannot create plans or groups)
+az role assignment create --assignee "$appId" --role "Website Contributor" \
+  --scope "$(az webapp show -g "$RG" -n "$APP" --query id -o tsv)"
+
+# Repository secrets and variables
+gh secret set AZURE_CLIENT_ID --body "$appId"
+gh secret set AZURE_TENANT_ID --body "$(az account show --query tenantId -o tsv)"
+gh secret set AZURE_SUBSCRIPTION_ID --body "$(az account show --query id -o tsv)"
+gh variable set APP --body "$APP"
+gh variable set RG --body "$RG"
+```
+
+Role assignments can take a few minutes to take effect.
+
+#### Running and queueing deploys
+
+To deploy without pushing, open **Actions → Deploy → Run workflow** and pick `main`, or run:
+
+```bash
+gh workflow run Deploy --ref main
+```
+
+Runs on any other branch fail with "Only main can be deployed". Only one deploy runs at a
+time (concurrency group `deploy-production`). A run that starts while another is in
+progress waits for it and never cancels it. GitHub keeps at most one waiting run, so
+after several quick pushes the newest one replaces the older waiting run, and the final
+deploy is still the latest `main`.
+
+To turn off automatic deploys, disable the `Deploy` workflow in the Actions tab;
+`./scripts/deploy.sh` keeps working as before.
 
 ## Teardown
 

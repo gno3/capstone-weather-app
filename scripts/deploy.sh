@@ -31,17 +31,6 @@ check_app_name() {
   [[ "$available" == "true" ]] || die "App name '$APP' is taken; run APP=<unique-name> ./scripts/deploy.sh"
 }
 
-build_package() {
-  npm ci
-  npm run build
-  # standalone omits public/ and .next/static; copy them in or the page loads unstyled
-  rm -rf .next/standalone/public .next/standalone/.next/static
-  cp -r public .next/standalone/public
-  cp -r .next/static .next/standalone/.next/static
-  rm -f app.zip
-  (cd .next/standalone && zip -qr ../../app.zip .)
-}
-
 provision() {
   if [[ "$(az group exists -n "$RG")" != "true" ]]; then
     az group create -n "$RG" -l "$LOC" -o none
@@ -77,7 +66,7 @@ main() {
   preflight
   echo "Deploying APP=$APP RG=$RG LOC=$LOC PLAN=$PLAN SKU=$SKU"
   check_app_name
-  build_package
+  "$(dirname "$0")/package.sh"
   provision
   configure_and_deploy
   local url
