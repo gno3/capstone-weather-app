@@ -306,13 +306,17 @@ APP=capstone-weather-app RG=rg-capstone-weather-app
 appId=$(az ad app create --display-name "gh-capstone-weather-app-deploy" --query appId -o tsv)
 az ad sp create --id "$appId" -o none
 
-# Trust GitHub's OIDC tokens for this repository's main branch only
-az ad app federated-credential create --id "$appId" --parameters '{
-  "name": "github-main",
-  "issuer": "https://token.actions.githubusercontent.com",
-  "subject": "repo:gno3/capstone-weather-app:ref:refs/heads/main",
-  "audiences": ["api://AzureADTokenExchange"]
-}'
+# Trust GitHub's OIDC tokens for this repository's main branch only. The subject prefix
+# comes from GitHub: newer repositories use immutable IDs
+# (repo:gno3@<owner-id>/capstone-weather-app@<repo-id>), older ones use
+# repo:gno3/capstone-weather-app. It must match exactly, or sign-in fails with AADSTS700213.
+prefix=$(gh api repos/gno3/capstone-weather-app/actions/oidc/customization/sub --jq .sub_claim_prefix)
+az ad app federated-credential create --id "$appId" --parameters "{
+  \"name\": \"github-main\",
+  \"issuer\": \"https://token.actions.githubusercontent.com\",
+  \"subject\": \"$prefix:ref:refs/heads/main\",
+  \"audiences\": [\"api://AzureADTokenExchange\"]
+}"
 
 # Website Contributor on this one web app (can deploy; cannot create plans or groups)
 az role assignment create --assignee "$appId" --role "Website Contributor" \

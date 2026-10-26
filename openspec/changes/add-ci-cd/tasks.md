@@ -27,7 +27,7 @@
 - [x] 3.5 Add README "CI/CD" section part 2:
   - A table of the secrets (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`) and the variables (`APP`, `RG`), saying what each holds.
   - A note that `./scripts/deploy.sh` must have provisioned the app first, and that CI/CD never creates resources or changes settings.
-  - The one-time `az` commands for an app registration, the federated credential (`repo:gno3/capstone-weather-app:ref:refs/heads/main`, audience `api://AzureADTokenExchange`), and a **Website Contributor** role assignment scoped to the web app.
+  - The one-time `az` commands for an app registration, the federated credential (subject `<sub_claim_prefix>:ref:refs/heads/main`, with the prefix read from `gh api repos/gno3/capstone-weather-app/actions/oidc/customization/sub`, e.g. `repo:gno3@6627331/capstone-weather-app@1434877178` for this repo's immutable subjects; audience `api://AzureADTokenExchange`), and a **Website Contributor** role assignment scoped to the web app.
   - How to run the deploy manually, and the concurrency and queueing behavior.
 
   Verify that every secret and variable referenced in `deploy.yml` appears in the README table

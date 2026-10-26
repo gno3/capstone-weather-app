@@ -44,7 +44,7 @@ See proposal.md for motivation, and `specs/ci-cd` and `specs/azure-deployment` f
 ### 3. Deploy configuration and gating
 - Triggers: `push: branches: [main]` and `workflow_dispatch`.
 - `permissions: { id-token: write, contents: read }` at workflow level.
-- Guard step first: fail with a clear message if `github.ref != 'refs/heads/main'` (spec: manual run on another branch). This matches the federated credential subject `repo:gno3/capstone-weather-app:ref:refs/heads/main`, so a run from another branch could not sign in anyway; the guard explains why, instead of leaving an opaque login error.
+- Guard step first: fail with a clear message if `github.ref != 'refs/heads/main'` (spec: manual run on another branch). This matches the federated credential subject (`…:ref:refs/heads/main`, see decision 6), so a run from another branch could not sign in anyway; the guard explains why, instead of leaving an opaque login error.
 - Config check step (before checks/packaging): fail naming any empty `vars.APP`, `vars.RG`, or any of the three secrets (secrets passed via `env`, tested with `[[ -n ... ]]`, never echoed).
 - `azure/login@v2` with `client-id`, `tenant-id`, `subscription-id` from secrets. No `creds` JSON and no client secret.
 
@@ -59,7 +59,9 @@ See proposal.md for motivation, and `specs/ci-cd` and `specs/azure-deployment` f
 `deploy.yml`: `concurrency: { group: deploy-production, cancel-in-progress: false }`. The group name is fixed rather than per-ref because only `main` deploys and there is one target. `ci.yml`: `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }`, so superseded PR pushes don't waste runners. This doesn't affect the deploy guarantee.
 
 ### 6. Azure identity scope (documented in the README)
-The README tells maintainers to create an app registration (or user-assigned managed identity), add a federated credential for subject `repo:<owner>/<repo>:ref:refs/heads/main` with audience `api://AzureADTokenExchange`, and assign **Website Contributor** scoped to the web app resource only. That is enough for `webapp show` and `webapp deploy`, and it cannot create plans or groups, so the "never provisions" rule is also enforced by permissions, not just by the scripts. The README gives the `az` commands, and the maintainer runs them by hand.
+The README tells maintainers to create an app registration (or user-assigned managed identity), add a federated credential for subject `<sub_claim_prefix>:ref:refs/heads/main` with audience `api://AzureADTokenExchange`, and assign **Website Contributor** scoped to the web app resource only. That is enough for `webapp show` and `webapp deploy`, and it cannot create plans or groups, so the "never provisions" rule is also enforced by permissions, not just by the scripts. The README gives the `az` commands, and the maintainer runs them by hand.
+
+The subject prefix is read from `gh api repos/<owner>/<repo>/actions/oidc/customization/sub` (`.sub_claim_prefix`) rather than hard-coded. Repositories created after GitHub's July 2026 change, including this one, use immutable subjects (`repo:<owner>@<owner-id>/<repo>@<repo-id>`), and a credential with the old name-only subject fails sign-in with AADSTS700213. Immutable subjects are kept rather than opted out of, because they cannot be claimed by a later repository that reuses the name.
 
 ## Risks / Trade-offs
 
