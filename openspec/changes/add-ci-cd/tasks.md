@@ -34,11 +34,11 @@
 
 ## 4. End-to-end verification on GitHub
 
-- [ ] 4.1 Complete the one-time setup from the README (identity, secrets, variables, required `ci` check) and run `Deploy` manually on `main`; verify the run is green, the summary shows `https://<APP>.azurewebsites.net`, and `curl -i https://<APP>.azurewebsites.net/api/health` returns 200
-- [ ] 4.2 Verify that a failing test blocks merge: open a PR that adds a deliberately failing assertion, confirm the `ci` check fails and the merge button is blocked, then close the PR without merging
+- [x] 4.1 Complete the one-time setup from the README (identity, secrets, variables, required `ci` check) and run `Deploy` manually on `main`; verify the run is green, the summary shows `https://<APP>.azurewebsites.net`, and `curl -i https://<APP>.azurewebsites.net/api/health` returns 200
+- [x] 4.2 Verify that a failing test blocks merge: open a PR that adds a deliberately failing assertion, confirm the `ci` check fails and the merge button is blocked, then close the PR without merging
 - [ ] 4.3 Verify that merging to main deploys: merge a harmless PR (e.g. a README tweak) with a green `ci` check, and confirm the `Deploy` run triggered by the push succeeds with the health check passing
 - [ ] 4.4 Verify that a failed health check fails the run: as an operator outside CI, stop the web app (`az webapp stop -g <RG> -n <APP>`), then dispatch `Deploy` on `main`. Confirm the run is marked failed after about 3 minutes with the `/api/health` URL in the message, then run `az webapp start` and re-dispatch to restore a green deploy. Also confirm locally that `bash -c 'source scripts/deploy.sh; wait_healthy http://127.0.0.1:9 10'` exits non-zero with the URL in its message
-- [ ] 4.5 Verify settings are untouched: compare `az webapp config appsettings list` and `az webapp show --query "{https:httpsOnly}"` / `az webapp config show --query appCommandLine` before and after a pipeline deploy, and confirm they are identical
+- [x] 4.5 Verify settings are untouched: compare `az webapp config appsettings list` and `az webapp show --query "{https:httpsOnly}"` / `az webapp config show --query appCommandLine` before and after a pipeline deploy, and confirm they are identical
 - [x] 4.6 Run `openspec validate add-ci-cd --strict` and confirm the change is valid
 
 ## Workflow follow-up

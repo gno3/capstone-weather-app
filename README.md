@@ -1,5 +1,8 @@
 # Capstone Weather App
 
+[![CI](https://github.com/gno3/capstone-weather-app/actions/workflows/ci.yml/badge.svg)](https://github.com/gno3/capstone-weather-app/actions/workflows/ci.yml)
+[![Deploy](https://github.com/gno3/capstone-weather-app/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/gno3/capstone-weather-app/actions/workflows/deploy.yml)
+
 A mobile-first weather dashboard built with Next.js (App Router), TypeScript, Tailwind CSS,
 and Recharts, using forecast and geocoding data from [Open-Meteo](https://open-meteo.com/).
 It is hosted on Azure App Service (Linux, Node 22 LTS) as a Next.js standalone build.
