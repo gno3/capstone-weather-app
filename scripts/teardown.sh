@@ -3,7 +3,7 @@
 # Usage: ./scripts/teardown.sh   (override with RG=...)
 set -euo pipefail
 
-RG="${RG:-rg-capstone-weather-app}"
+RG="${RG:-rg-weather-mvp}"
 
 die() { echo "error: $*" >&2; exit 1; }
 
