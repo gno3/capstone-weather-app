@@ -70,8 +70,17 @@ jobs:
           host=$(az webapp show -g "$RG" -n "$APP" --query defaultHostName -o tsv)
           echo "host=$host" >> "$GITHUB_OUTPUT"
 
+      # Kudu can return a transient 502 while the site container restarts mid-deploy,
+      # so retry the (idempotent) upload; the health check below confirms the result.
       - name: Upload package
-        run: az webapp deploy -g "$RG" -n "$APP" --src-path app.zip --type zip --track-status false
+        run: |
+          for attempt in 1 2 3; do
+            az webapp deploy -g "$RG" -n "$APP" --src-path app.zip --type zip --track-status false && exit 0
+            echo "::warning::Upload attempt $attempt failed."
+            if ((attempt < 3)); then sleep 30; fi
+          done
+          echo "::error::Upload failed after 3 attempts."
+          exit 1
 
       - name: Wait for /api/health
         env:

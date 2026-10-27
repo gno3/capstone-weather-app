@@ -331,7 +331,9 @@ every push to `main` and on manual runs. It:
    If any of these fail, nothing is uploaded.
 3. Signs in to Azure with OpenID Connect (no client secret or publish profile), reads the
    web app's host name, and zip-deploys `app.zip` with `az webapp deploy` (without
-   waiting for start-up; the health check in the next step covers that).
+   waiting for start-up; the health check in the next step covers that). The upload is
+   retried up to 3 times, 30 s apart, because Kudu can return a transient HTTP 502 while
+   the site container restarts during a deploy.
 4. Polls `https://<host>/api/health` for up to 3 minutes. The run passes only if it gets
    HTTP 200, and the app URL is written to the run summary.
 
