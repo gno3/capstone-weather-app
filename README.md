@@ -130,6 +130,18 @@ deployment such as `gpt-4o-mini`. Reasoning models are not recommended, because 
 reject `temperature` or spend the small output budget (120 tokens) on reasoning. If any of
 the three variables is unset, the feature is disabled.
 
+### Weather chat
+
+A collapsible "Ask about the weather" panel below the heading answers plain-language
+questions such as "Will it rain tomorrow?" or "What about Denver?". It uses the same Azure
+OpenAI settings as the summary, calls only [`POST /api/chat`](#post-apichat), and answers from
+Open-Meteo forecast and location lookups rather than model memory. Questions default to the
+dashboard's location and units, ambiguous place names get a clarifying question, and
+dates beyond the 7-day forecast are explained rather than guessed. Messages are limited to
+500 characters and conversations to 10 messages; the conversation lives only in the page
+and is cleared on reload. If chat fails or is unconfigured, the panel shows a retry
+message and the rest of the dashboard is unaffected.
+
 ## Weather data
 
 Forecasts and geocoding come from [Open-Meteo](https://open-meteo.com/) (no API key,
@@ -222,6 +234,41 @@ Liveness check used by the deploy script. Always `200 { "status": "ok" }` with
 ```bash
 curl -i http://localhost:3000/api/health
 ```
+
+### `POST /api/chat`
+
+Answers one chat turn using Azure OpenAI with two server-side tools, `search_locations` and
+`get_forecast`, backed by `lib/openmeteo.ts`. Requires the [AI summary](#ai-summary)
+settings. Request:
+
+```jsonc
+{
+  "messages": [{ "role": "user", "content": "Will it rain tomorrow?" }], // user/assistant, ends with user
+  "context": { "lat": 42.128, "lon": -87.829, "name": "Northbrook, IL", "units": "imperial" }
+}
+```
+
+Response: `{ "reply": string, "toolCalls": [{ "name": string, "arguments": object }] }`, where
+`toolCalls` lists every tool the model invoked, in order (tool results are not returned).
+
+```bash
+curl -s -X POST http://localhost:3000/api/chat -H 'content-type: application/json' \
+  -d '{"messages":[{"role":"user","content":"Will it rain tomorrow?"}],"context":{"lat":42.128,"lon":-87.829,"name":"Northbrook, IL","units":"imperial"}}'
+```
+
+| Case | Status | Body |
+| --- | --- | --- |
+| Success | 200 | `{ "reply": "…", "toolCalls": […] }` |
+| Invalid JSON, bad shape, last message not from the user, blank message, user message > 500 chars, assistant message > 1,000 chars, > 10 messages, or invalid `context` (`lat` ±90, `lon` ±180, `units` `imperial`/`metric`, `name` 1–200 chars) | 400 | `{ "error": "<specific friendly message>" }` |
+| More than 20 requests per client IP in 5 minutes | 429 + `Retry-After` | `{ "error": "Too many questions. Try again in a few minutes." }` |
+| Azure OpenAI not configured | 503 | `{ "error": "Chat is unavailable right now." }` |
+| AI call failed or returned no text | 502 | `{ "error": "Chat couldn't answer right now. Please try again." }` |
+
+The server runs at most 4 tool rounds (up to 4 tool calls each), then forces a final answer,
+so a request makes at most 5 model calls. Tool arguments are validated before any
+Open-Meteo call. The rate limit is in memory, per server instance, and resets on restart;
+the client IP is the first `X-Forwarded-For` entry. Errors are logged with a `[chat]` prefix
+and never include message contents.
 
 ## Deploy to Azure
 

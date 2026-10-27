@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import AiSummary from "@/components/AiSummary";
+import ChatPanel from "@/components/ChatPanel";
 import CurrentCard from "@/components/CurrentCard";
 import DailyList from "@/components/DailyList";
 import HourlyChart from "@/components/HourlyChart";
@@ -59,6 +60,7 @@ async function Dashboard({ searchParams }: { searchParams: PageProps<"/">["searc
         </h1>
         <UnitsToggle units={units} />
       </div>
+      <ChatPanel lat={location.lat} lon={location.lon} name={location.label} units={units} />
       {/* Keyed so a new location/unit shows skeletons instead of stale weather. */}
       <Suspense key={`${location.lat},${location.lon},${units}`} fallback={<WeatherSkeleton />}>
         <ForecastContent
