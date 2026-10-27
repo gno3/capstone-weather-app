@@ -13,7 +13,8 @@ It is hosted on Azure App Service (Linux, Node 22 LTS) as a Next.js standalone b
 - For deploying: an Azure subscription, the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli),
   `zip`, and `curl` (bash on Linux, macOS, or WSL)
 
-No API keys are needed.
+No API keys are needed. The optional [AI summary](#ai-summary) uses Microsoft Entra ID
+instead of keys.
 
 ## Local development
 
@@ -102,6 +103,32 @@ loading or failures.
 
 In the DevTools Network panel, the browser should make no requests to `open-meteo.com` and
 none to `/api/forecast`; forecast data arrives in the server-rendered payload.
+
+### AI summary
+
+When Azure OpenAI is configured, an "AI summary" section above current conditions shows a
+2-3 sentence plain-language briefing of the forecast. Only the server calls Azure OpenAI.
+It sends a compact view of the forecast: current conditions, the next 24 hours, and the
+next 3 days, in the selected units. Summaries are cached per location, units, and
+forecast-local hour (in memory, per server instance). The section streams in after the
+rest of the dashboard. If configuration is missing or the call fails, the section is
+hidden, the error is logged server-side with an `[ai-summary]` prefix, and everything else
+renders normally.
+
+Set three environment variables, for example in `.env.local` (not committed):
+
+```bash
+AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com
+AZURE_OPENAI_DEPLOYMENT=<your-chat-deployment-name>
+AZURE_OPENAI_API_VERSION=2024-10-21
+```
+
+There is no API key. The app authenticates with Microsoft Entra ID through
+`DefaultAzureCredential`. Locally, run `az login` with an account that has the
+`Cognitive Services OpenAI User` role on the Azure OpenAI resource. Use a chat model
+deployment such as `gpt-4o-mini`. Reasoning models are not recommended, because they can
+reject `temperature` or spend the small output budget (120 tokens) on reasoning. If any of
+the three variables is unset, the feature is disabled.
 
 ## Weather data
 
@@ -227,6 +254,31 @@ APP=my-weather-1234 ./scripts/deploy.sh
 
 Re-running the script is safe: existing resources are reused, the settings are re-applied,
 and the new build replaces the old one. Use the same variables each time.
+
+The [AI summary](#ai-summary) is optional, and the script does not provision it. To enable
+it on the deployed app, set up the following once:
+
+1. Create an Azure OpenAI resource and a chat model deployment (for example
+   `gpt-4o-mini`).
+2. Turn on the web app's system-assigned managed identity.
+3. Grant that identity the `Cognitive Services OpenAI User` role on the Azure OpenAI
+   resource.
+4. Set the three app settings `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, and
+   `AZURE_OPENAI_API_VERSION`.
+
+```bash
+PRINCIPAL_ID=$(az webapp identity assign -g "$RG" -n "$APP" --query principalId -o tsv)
+AOAI_ID=$(az cognitiveservices account show -g <aoai-rg> -n <aoai-name> --query id -o tsv)
+az role assignment create --assignee-object-id "$PRINCIPAL_ID" \
+  --assignee-principal-type ServicePrincipal \
+  --role "Cognitive Services OpenAI User" --scope "$AOAI_ID"
+az webapp config appsettings set -g "$RG" -n "$APP" --settings \
+  AZURE_OPENAI_ENDPOINT=https://<aoai-name>.openai.azure.com \
+  AZURE_OPENAI_DEPLOYMENT=<deployment> AZURE_OPENAI_API_VERSION=2024-10-21
+```
+
+Without these settings, the dashboard works as before, just without the summary.
+`deploy.sh` leaves these settings in place when it re-runs.
 
 ### Package only
 

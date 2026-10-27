@@ -1,11 +1,17 @@
 import { Suspense } from "react";
+import AiSummary from "@/components/AiSummary";
 import CurrentCard from "@/components/CurrentCard";
 import DailyList from "@/components/DailyList";
 import HourlyChart from "@/components/HourlyChart";
 import LocationSearch from "@/components/LocationSearch";
 import SunTimes from "@/components/SunTimes";
 import UnitsToggle from "@/components/UnitsToggle";
-import { HeadingSkeleton, SearchSkeleton, WeatherSkeleton } from "@/components/WeatherSkeleton";
+import {
+  AiSummarySkeleton,
+  HeadingSkeleton,
+  SearchSkeleton,
+  WeatherSkeleton,
+} from "@/components/WeatherSkeleton";
 import { resolveLocation } from "@/lib/location";
 import { getForecast } from "@/lib/openmeteo";
 import type { UnitSystem } from "@/lib/types";
@@ -15,14 +21,21 @@ async function ForecastContent({
   lat,
   lon,
   units,
+  locationName,
 }: {
   lat: number;
   lon: number;
   units: UnitSystem;
+  locationName: string;
 }) {
   const forecast = await getForecast(lat, lon, units);
+  // Forecast-local hour (e.g. "2026-10-26T14") keys the cached summary.
+  const hour = forecast.current.time.slice(0, 13);
   return (
     <div className="flex min-w-0 flex-col gap-4">
+      <Suspense fallback={<AiSummarySkeleton />}>
+        <AiSummary lat={lat} lon={lon} units={units} locationName={locationName} hour={hour} />
+      </Suspense>
       <CurrentCard current={forecast.current} units={forecast.units} />
       <HourlyChart hourly={forecast.hourly} units={forecast.units} timezone={forecast.timezone} />
       <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] sm:items-start">
@@ -48,7 +61,12 @@ async function Dashboard({ searchParams }: { searchParams: PageProps<"/">["searc
       </div>
       {/* Keyed so a new location/unit shows skeletons instead of stale weather. */}
       <Suspense key={`${location.lat},${location.lon},${units}`} fallback={<WeatherSkeleton />}>
-        <ForecastContent lat={location.lat} lon={location.lon} units={units} />
+        <ForecastContent
+          lat={location.lat}
+          lon={location.lon}
+          units={units}
+          locationName={location.label}
+        />
       </Suspense>
     </>
   );

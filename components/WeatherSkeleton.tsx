@@ -54,6 +54,17 @@ export function WeatherSkeleton() {
   );
 }
 
+/** One-line placeholder for the AI summary; contains no text. */
+export function AiSummarySkeleton() {
+  return (
+    <div role="status" aria-label="Loading AI summary">
+      <Card>
+        <Block className="h-5 w-full" />
+      </Card>
+    </div>
+  );
+}
+
 /** Placeholder for the location heading and units control. */
 export function HeadingSkeleton() {
   return (
